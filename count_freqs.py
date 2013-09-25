@@ -174,6 +174,9 @@ def replace_rare(name):
 
         l = filename.readline()
 
+    # print out word counts
+    #print word_count
+
     new_training = "ner_train_replaced.dat"
     shutil.copyfile(name, new_training)
 
@@ -186,9 +189,14 @@ def replace_rare(name):
     for word in word_count:
         if (word_count[word] < 5):
             tmp = open(new_training_tmp,"a") #open for append
-            for line in open(new_training):
-                line = line.replace(word, "_RARE_")
-                tmp.write(line)
+            for l in open(new_training):
+                line = l.strip()
+                if line: # Nonempty line
+                    fields = line.split(" ")
+                    # word must match first term EXACTLY
+                    if (fields[0] == word):
+                        line = line.replace(word, "_RARE_")
+                tmp.write(line + '\n')
             tmp.close()
             os.remove(new_training)
             os.rename(new_training_tmp, new_training)
