@@ -179,19 +179,31 @@ def replace_rare(name):
 
 
     # now replace all rare words
-    new_training_bak = "ner_train_replaced.dat.bak"
-    import re, os
-##### CANT USE REGEX, PROBLEMS WITH PARSING WITH LITERALS #####
+    new_training_tmp = "ner_train_replaced.dat.tmp"
+
+    import os
+
     for word in word_count:
         if (word_count[word] < 5):
-            word2replace = str(word)
-            o = open(new_training_bak,"w")
-            data = open(new_training).read()
-            o.write( re.sub("Moada", "_RARE_",data))
-            o.close()
-
+            tmp = open(new_training_tmp,"a") #open for append
+            for line in open(new_training):
+                line = line.replace(word, "_RARE_")
+                tmp.write(line)
+            tmp.close()
             os.remove(new_training)
-            os.rename(new_training_bak, new_training)
+            os.rename(new_training_tmp, new_training)
+
+##### CANT USE REGEX, PROBLEMS WITH PARSING WITH LITERALS #####
+    # for word in word_count:
+    #     if (word_count[word] < 5):
+    #         word2replace = str(word)
+    #         o = open(new_training_bak,"w")
+    #         data = open(new_training).read()
+    #         o.write( re.sub("Moada", "_RARE_",data))
+    #         o.close()
+    #
+    #         os.remove(new_training)
+    #         os.rename(new_training_bak, new_training)
 
 
 
