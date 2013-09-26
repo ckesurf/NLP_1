@@ -111,9 +111,9 @@ class Hmm(object):
             if ngram[-2][0] is None: # this is the first n-gram in a sentence
                 self.ngram_counts[self.n - 2][tuple((self.n - 1) * ["*"])] += 1
 
-        # Create tag frequency
+        # Create tag frequency and word count
         for word, ne_tag in self.emission_counts:
-            self.tag_frequency[ne_tag] += 1
+            self.tag_frequency[ne_tag] += self.emission_counts[(word, ne_tag)]
 
 
     def write_counts(self, output, printngrams=[1,2,3]):
@@ -123,7 +123,7 @@ class Hmm(object):
 
         """
         # First write counts for emissions
-        for word, ne_tag in self.emission_counts:            
+        for word, ne_tag in self.emission_counts:
             output.write("%i WORDTAG %s %s\n" % (self.emission_counts[(word, ne_tag)], ne_tag, word))
 
 
@@ -148,22 +148,27 @@ class Hmm(object):
                 word = parts[3]
                 self.emission_counts[(word, ne_tag)] = count
                 self.all_states.add(ne_tag)
-                self.tag_frequency[ne_tag] += 1
+                self.tag_frequency[ne_tag] += self.emission_counts[(word, ne_tag)]
             elif parts[1].endswith("GRAM"):
                 n = int(parts[1].replace("-GRAM",""))
                 ngram = tuple(parts[2:])
                 self.ngram_counts[n-1][ngram] = count
+        print self.tag_frequency
 
     def emission_params(self, x, y):
+        test = self.emission_counts[(x, y)]/float(self.tag_frequency[y])
+        emis_count = self.emission_counts[(x, y)]
         return self.emission_counts[(x, y)]/float(self.tag_frequency[y])
 
     def entity_tagger(self, x):
         # find the tag y with highest emission_params score
         # what are all the tags a word could have?
-        best_tag = 0
+        best_tag = ""
+        best_tag_prob = 0
         for tag in self.all_states:
-            if self.emission_params(x, tag) > 0:
-                best_tag = self.emission_params(x, y)
+            if self.emission_params(x, tag) > best_tag_prob:
+                best_tag = tag
+                best_tag_prob = self.emission_params(x, tag)
         return best_tag
 
                 
@@ -210,9 +215,6 @@ def replace_rare(name):
             os.remove(new_training)
             os.rename(new_training_tmp, new_training)
 
-
-
-
 def usage():
     print """
     python count_freqs.py [input_file] > [output_file]
@@ -234,12 +236,19 @@ if __name__ == "__main__":
     #
     #
     # Initialize a trigram counter
-    counter = Hmm(3)
+    # counter = Hmm(3)
     # # Collect counts
-    counter.train(input)
-    # Write the counts
-    counter.write_counts(sys.stdout)
-    #counter.read_counts(ner_counts)
+    # counter.train(input)
+    # # Write the counts
+    # counter.write_counts(sys.stdout)
 
     # Replace infrequent words (where Count(x) < 5) in input data file to _RARE_
     # replace_rare(sys.argv[1])
+
+    # Print out entity tagger
+    counter = Hmm(3)
+    # # Read counts, training the Hmm
+    counter.read_counts(input)
+    # #
+    best_tag = counter.entity_tagger("_RARE_")
+    print best_tag
