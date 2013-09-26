@@ -188,7 +188,14 @@ class Hmm(object):
                 output.write("%s %s %f\n" % (original_word, best_tag, math.log(self.emission_params(word, best_tag), 2)))
             else:   # Blank line
                 output.write(line)
-                
+
+    def trigram_prob(self, y1, y2, y3):
+        count_y1_y2_y3 = self.ngram_counts[2][(y1, y2, y3)]
+        count_y1_y2 = self.ngram_counts[1][(y1, y2)]
+        return self.ngram_counts[2][(y1, y2, y3)]/self.ngram_counts[1][(y1, y2)]
+
+
+
 def replace_rare(name):
 
     word_count = defaultdict(int)
@@ -267,6 +274,8 @@ if __name__ == "__main__":
     # # Read counts, training the Hmm
     counter.read_counts(input)
     # # Now that we've trained our Hmm, try it out on development data
-    dev_input = file(sys.argv[2], "r")
-    counter.write_predictions(dev_input, sys.stdout)
+    # dev_input = file(sys.argv[2], "r")
+    # counter.write_predictions(dev_input, sys.stdout)
 
+    # # testing trigram model
+    print counter.trigram_prob('O', 'O', 'I-LOC')
