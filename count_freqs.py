@@ -155,8 +155,17 @@ class Hmm(object):
                 self.ngram_counts[n-1][ngram] = count
 
     def emission_params(self, x, y):
-
         return self.emission_counts[(x, y)]/float(self.tag_frequency[y])
+
+    def entity_tagger(self, x):
+        # find the tag y with highest emission_params score
+        # what are all the tags a word could have?
+        best_tag = 0
+        for tag in self.all_states:
+            if self.emission_params(x, tag) > 0:
+                best_tag = self.emission_params(x, y)
+        return best_tag
+
                 
 def replace_rare(name):
 
@@ -201,17 +210,6 @@ def replace_rare(name):
             os.remove(new_training)
             os.rename(new_training_tmp, new_training)
 
-##### CANT USE REGEX, PROBLEMS WITH PARSING WITH LITERALS #####
-    # for word in word_count:
-    #     if (word_count[word] < 5):
-    #         word2replace = str(word)
-    #         o = open(new_training_bak,"w")
-    #         data = open(new_training).read()
-    #         o.write( re.sub("Moada", "_RARE_",data))
-    #         o.close()
-    #
-    #         os.remove(new_training)
-    #         os.rename(new_training_bak, new_training)
 
 
 
@@ -223,9 +221,9 @@ def usage():
 
 if __name__ == "__main__":
 
-    # if len(sys.argv)!=2: # Expect exactly one argument: the training data file
-    #     usage()
-    #     sys.exit(2)
+    if len(sys.argv)!=2: # Expect exactly one argument: the training data file
+        usage()
+        sys.exit(2)
 
     try:
         input = file(sys.argv[1],"r")
@@ -236,13 +234,12 @@ if __name__ == "__main__":
     #
     #
     # Initialize a trigram counter
-    # counter = Hmm(3)
+    counter = Hmm(3)
     # # Collect counts
-    # counter.train(input)
+    counter.train(input)
     # Write the counts
-    # counter.write_counts(sys.stdout)
+    counter.write_counts(sys.stdout)
     #counter.read_counts(ner_counts)
 
     # Replace infrequent words (where Count(x) < 5) in input data file to _RARE_
-    replace_rare(sys.argv[1])
-
+    # replace_rare(sys.argv[1])
