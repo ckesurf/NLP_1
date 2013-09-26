@@ -139,6 +139,7 @@ class Hmm(object):
         self.emission_counts = defaultdict(int)
         self.ngram_counts = [defaultdict(int) for i in xrange(self.n)]
         self.all_states = set()
+        self.all_words = set()
 
         for line in corpusfile:
             parts = line.strip().split(" ")
@@ -149,20 +150,17 @@ class Hmm(object):
                 self.emission_counts[(word, ne_tag)] = count
                 self.all_states.add(ne_tag)
                 self.tag_frequency[ne_tag] += self.emission_counts[(word, ne_tag)]
+                self.all_words.add(word)
             elif parts[1].endswith("GRAM"):
                 n = int(parts[1].replace("-GRAM",""))
                 ngram = tuple(parts[2:])
                 self.ngram_counts[n-1][ngram] = count
-        print self.tag_frequency
 
     def emission_params(self, x, y):
-        test = self.emission_counts[(x, y)]/float(self.tag_frequency[y])
-        emis_count = self.emission_counts[(x, y)]
         return self.emission_counts[(x, y)]/float(self.tag_frequency[y])
 
     def entity_tagger(self, x):
-        # find the tag y with highest emission_params score
-        # what are all the tags a word could have?
+        # find the tag with highest emission_params score
         best_tag = ""
         best_tag_prob = 0
         for tag in self.all_states:
@@ -171,6 +169,25 @@ class Hmm(object):
                 best_tag_prob = self.emission_params(x, tag)
         return best_tag
 
+    def write_predictions(self, dev_input, output):
+        """
+        Writes log probability for each prediction in the following format:
+            word tag log_probability
+        """
+
+        for line in dev_input:
+            original_word = line.strip()
+            if original_word:
+                word = original_word
+                if word not in self.all_words:
+                    word = "_RARE_"
+
+                best_tag = self.entity_tagger(word)
+                prob = self.emission_params(word, best_tag)
+                log_prob = math.log(self.emission_params(word, best_tag), 2)
+                output.write("%s %s %f\n" % (original_word, best_tag, math.log(self.emission_params(word, best_tag), 2)))
+            else:   # Blank line
+                output.write(line)
                 
 def replace_rare(name):
 
@@ -223,9 +240,9 @@ def usage():
 
 if __name__ == "__main__":
 
-    if len(sys.argv)!=2: # Expect exactly one argument: the training data file
-        usage()
-        sys.exit(2)
+    # if len(sys.argv)!=2: # Expect exactly one argument: the training data file
+    #     usage()
+    #     sys.exit(2)
 
     try:
         input = file(sys.argv[1],"r")
@@ -249,6 +266,7 @@ if __name__ == "__main__":
     counter = Hmm(3)
     # # Read counts, training the Hmm
     counter.read_counts(input)
-    # #
-    best_tag = counter.entity_tagger("_RARE_")
-    print best_tag
+    # # Now that we've trained our Hmm, try it out on development data
+    dev_input = file(sys.argv[2], "r")
+    counter.write_predictions(dev_input, sys.stdout)
+
