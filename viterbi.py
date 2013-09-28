@@ -286,7 +286,7 @@ class Hmm(object):
                 # Viterbi time! Write probabilities and tags to stdout, then clear data
                 tags = self.viterbi(sentence)
                 for k in range(1, sentence.__len__()-1):
-                    print("%s -> %f" % (orig_sentence[k], self.pi_dict[k, tags[k-1], tags[k]]))
+                    print("%s %s %f" % (orig_sentence[k], tags[k], math.log(self.pi_dict[k, tags[k-1], tags[k]])))
                 print
                 # garbage collection
                 del tags

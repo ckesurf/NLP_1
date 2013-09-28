@@ -194,23 +194,34 @@ class Hmm(object):
         count_y1_y2 = self.ngram_counts[1][(y1, y2)]
         return self.ngram_counts[2][(y1, y2, y3)]/self.ngram_counts[1][(y1, y2)]
 
-    def write_tag_trigrams(self, output):
-        for ngram in self.ngram_counts[2]:
-            ngramstr = " ".join(ngram)
-            log_prob = math.log(self.trigram_prob(ngram[0], ngram[1], ngram[2]))
-            output.write("%s %f\n" %( ngramstr, log_prob ))
+    def write_tag_trigrams(self, trigram_file, output):
+        l = trigram_file.readline()
+        while l:
+            line = l.strip()
+            if line: # Nonempty line
+                # Extract information from line.
+                # Each line has the format
+                # tag1 tag2 tag3
+                fields = line.split(" ")
+                log_prob = math.log(self.trigram_prob(fields[0], fields[1], fields[2]))
+                output.write("%s %f\n" %( line, log_prob ))
+            else:   # Blank line, just write it out.
+                output.write(line)
+            l = trigram_file.readline()
+
+            output.write("%s %f\n" %( line, log_prob ))
 
 
 def usage():
     print """
-    python count_freqs.py [input_file] > [output_file]
+    python count_freqs.py [training_file] [trigram_file] > [output_file]
         Read in a named entity tagged training input file, train Hmm,
-        then print out trigrams with log probabilities
+        calculate probabilities
     """
 
 if __name__ == "__main__":
 
-    if len(sys.argv)!=2: # Expect exactly two arguments: the training data file and development (test) file
+    if len(sys.argv)!=3: # Expect exactly two arguments: the training data file and development (test) file
         usage()
         sys.exit(2)
 
@@ -220,10 +231,15 @@ if __name__ == "__main__":
         sys.stderr.write("ERROR: Cannot read inputfile %s.\n" % arg)
         sys.exit(1)
     #
+    try:
+        trigram_file = file(sys.argv[2],"r")
+    except IOError:
+        sys.stderr.write("ERROR: Cannot read trigram file %s.\n" % arg)
+        sys.exit(1)
     #
     #
     counter = Hmm(3)
     # Read counts, training the Hmm
     counter.read_counts(input)
     # Now that we've trained our Hmm, write out trigrams with log probabilities
-    counter.write_tag_trigrams(sys.stdout)
+    counter.write_tag_trigrams(trigram_file, sys.stdout)
