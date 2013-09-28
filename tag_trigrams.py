@@ -169,25 +169,6 @@ class Hmm(object):
                 best_tag_prob = self.emission_params(x, tag)
         return best_tag
 
-    def write_predictions(self, dev_input, output):
-        """
-        Writes log probability for each prediction in the following format:
-            word tag log_probability
-        """
-
-        for line in dev_input:
-            original_word = line.strip()
-            if original_word:
-                word = original_word
-                if word not in self.all_words:
-                    word = "_RARE_"
-
-                best_tag = self.entity_tagger(word)
-                prob = self.emission_params(word, best_tag)
-                log_prob = math.log(self.emission_params(word, best_tag), 2)
-                output.write("%s %s %f\n" % (original_word, best_tag, math.log(self.emission_params(word, best_tag), 2)))
-            else:   # Blank line
-                output.write(line)
 
     def trigram_prob(self, y1, y2, y3):
         count_y1_y2_y3 = self.ngram_counts[2][(y1, y2, y3)]

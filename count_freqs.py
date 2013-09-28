@@ -133,67 +133,6 @@ class Hmm(object):
                 ngramstr = " ".join(ngram)
                 output.write("%i %i-GRAM %s\n" %(self.ngram_counts[n-1][ngram], n, ngramstr))
 
-    def read_counts(self, corpusfile):
-
-        self.n = 3
-        self.emission_counts = defaultdict(int)
-        self.ngram_counts = [defaultdict(int) for i in xrange(self.n)]
-        self.all_states = set()
-        self.all_words = set()
-
-        for line in corpusfile:
-            parts = line.strip().split(" ")
-            count = float(parts[0])
-            if parts[1] == "WORDTAG":
-                ne_tag = parts[2]
-                word = parts[3]
-                self.emission_counts[(word, ne_tag)] = count
-                self.all_states.add(ne_tag)
-                self.tag_frequency[ne_tag] += self.emission_counts[(word, ne_tag)]
-                self.all_words.add(word)
-            elif parts[1].endswith("GRAM"):
-                n = int(parts[1].replace("-GRAM",""))
-                ngram = tuple(parts[2:])
-                self.ngram_counts[n-1][ngram] = count
-
-    def emission_params(self, x, y):
-        return self.emission_counts[(x, y)]/float(self.tag_frequency[y])
-
-    def entity_tagger(self, x):
-        # find the tag with highest emission_params score
-        best_tag = ""
-        best_tag_prob = 0
-        for tag in self.all_states:
-            if self.emission_params(x, tag) > best_tag_prob:
-                best_tag = tag
-                best_tag_prob = self.emission_params(x, tag)
-        return best_tag
-
-    def write_predictions(self, dev_input, output):
-        """
-        Writes log probability for each prediction in the following format:
-            word tag log_probability
-        """
-
-        for line in dev_input:
-            original_word = line.strip()
-            if original_word:
-                word = original_word
-                if word not in self.all_words:
-                    word = "_RARE_"
-
-                best_tag = self.entity_tagger(word)
-                prob = self.emission_params(word, best_tag)
-                log_prob = math.log(self.emission_params(word, best_tag), 2)
-                output.write("%s %s %f\n" % (original_word, best_tag, math.log(self.emission_params(word, best_tag), 2)))
-            else:   # Blank line
-                output.write(line)
-
-    def trigram_prob(self, y1, y2, y3):
-        count_y1_y2_y3 = self.ngram_counts[2][(y1, y2, y3)]
-        count_y1_y2 = self.ngram_counts[1][(y1, y2)]
-        return self.ngram_counts[2][(y1, y2, y3)]/self.ngram_counts[1][(y1, y2)]
-
 
 def usage():
     print """

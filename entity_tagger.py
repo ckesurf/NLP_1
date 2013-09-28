@@ -140,6 +140,7 @@ class Hmm(object):
         self.ngram_counts = [defaultdict(int) for i in xrange(self.n)]
         self.all_states = set()
         self.all_words = set()
+        self.word_counts = defaultdict(int)
 
         for line in corpusfile:
             parts = line.strip().split(" ")
@@ -151,6 +152,7 @@ class Hmm(object):
                 self.all_states.add(ne_tag)
                 self.tag_frequency[ne_tag] += self.emission_counts[(word, ne_tag)]
                 self.all_words.add(word)
+                self.word_counts[word] += 1
             elif parts[1].endswith("GRAM"):
                 n = int(parts[1].replace("-GRAM",""))
                 ngram = tuple(parts[2:])
@@ -179,7 +181,7 @@ class Hmm(object):
             original_word = line.strip()
             if original_word:
                 word = original_word
-                if word not in self.all_words:
+                if self.word_counts[word] < 5:
                     word = "_RARE_"
 
                 best_tag = self.entity_tagger(word)
