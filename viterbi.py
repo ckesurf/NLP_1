@@ -164,16 +164,16 @@ class Hmm(object):
         self.tag_dict["*"] = "*"
 
     def emission_params(self, x, y):
-        if x == "the" and y == "D":
-            return 0.8
-        elif x == "dog" and y == "D":
-            return 0.2
-        elif x == "the" and y == "N":
-            return 0.2
-        elif x == "dog" and y == "N":
-            return 0.8
-        elif x == "barks" and y == "V":
-            return 1
+        # if x == "the" and y == "D":
+        #     return 0.8
+        # elif x == "dog" and y == "D":
+        #     return 0.2
+        # elif x == "the" and y == "N":
+        #     return 0.2
+        # elif x == "dog" and y == "N":
+        #     return 0.8
+        # elif x == "barks" and y == "V":
+        #     return 1
 
         if x == "*" and y == "*":
             return 1
@@ -191,14 +191,14 @@ class Hmm(object):
         return best_tag
 
     def trigram_prob(self, y1, y2, y3):
-        if y1 == "*" and y2 == "*" and y3 == "D":
-            return 1
-        elif y1 == "*" and y2 == "D" and y3 == "N":
-            return 1
-        elif y1 == "D" and y2 == "N" and y3 == "V":
-            return 1
-        elif y1 == "N" and y2 == "V" and y3 == "STOP":
-            return 1
+        # if y1 == "*" and y2 == "*" and y3 == "D":
+        #     return 1
+        # elif y1 == "*" and y2 == "D" and y3 == "N":
+        #     return 1
+        # elif y1 == "D" and y2 == "N" and y3 == "V":
+        #     return 1
+        # elif y1 == "N" and y2 == "V" and y3 == "STOP":
+        #     return 1
         count_y1_y2_y3 = self.ngram_counts[2][(y1, y2, y3)]
         count_y1_y2 = float(self.ngram_counts[1][(y1, y2)])
         if count_y1_y2 == 0 or count_y1_y2_y3 == 0:
@@ -229,31 +229,13 @@ class Hmm(object):
         max_prob = prob = 0
         best_tag = ""
         for w in self.tag_dict[sentence[k-2]]:
-            prob = self.pi(k-1, w, u)*self.trigram_prob(w, u, y)*self.emission_params(sentence[k], v)
+            prob = self.pi(k-1, w, u, sentence)*self.trigram_prob(w, u, v)*self.emission_params(sentence[k], v)
             if prob > max_prob:
                 max_prob = prob
                 best_tag = w
         return best_tag
 
-
-    def viterbi(self, filename):
-        sentence = list("*")
-        test_file = file(filename, "r")
-        l = test_file.readline()
-        while l:
-            word = l.strip()
-            if word: # Nonempty line
-                # if rare, replace with _RARE_
-                if self.word_count[word] < 5:
-                    sentence.append("_RARE_")
-                else:
-                    sentence.append(word)
-
-            else: # Empty line
-                sentence.append("*")
-                break
-            l = test_file.readline()
-
+    def viterbi(self, sentence):
         length = sentence.__len__() - 2     # -2 because we added two * strings
         # want k to go from 1 to n; range is exclusive, so following translates to [1, n]
 
@@ -261,7 +243,7 @@ class Hmm(object):
             for u in self.tag_dict[sentence[k-1]]:
                 for v in self.tag_dict[sentence[k]]:
                     self.pi(k, u, v, sentence)
-                    prob = self.pi_dict[(length, u, v)]
+                    prob = self.pi_dict[(k, u, v)]
 
         max_prob = prob = 0
         best_u_tag = best_v_tag = ""
@@ -275,14 +257,45 @@ class Hmm(object):
                     best_u_tag = u
                     best_v_tag = v
 
-        tags = {length-1: best_u_tag, length: best_v_tag}
+        tags = {length-1: best_u_tag, length: best_v_tag, 0: "*"}
         for k in range(length-2, 0, -1):
-            tags[k] = self.bp(k+2, tags[k+1], tags[k+2])
+            tags[k] = self.bp(k+2, tags[k+1], tags[k+2], sentence)
 
-        for k in range(1, length+1):
-            print("%s -> %s\n", sentence[k], tags[k])
 
-        return self.pi_dict[length, best_u_tag, best_v_tag]
+
+        return tags
+
+    def viterbi_file(self, filename):
+        orig_sentence = list("*")
+        sentence = list("*")
+        test_file = file(filename, "r")
+        l = test_file.readline()
+        while l:
+            word = l.strip()
+            if word: # Nonempty line
+                orig_sentence.append(word)
+                # if rare, replace with _RARE_
+                if self.word_count[word] < 5:
+                    sentence.append("_RARE_")
+                else:
+                    sentence.append(word)
+
+            else: # Empty line
+                orig_sentence.append("*")
+                sentence.append("*")
+                # Viterbi time! Write probabilities and tags to stdout, then clear data
+                tags = self.viterbi(sentence)
+                for k in range(1, sentence.__len__()-1):
+                    print("%s -> %f" % (orig_sentence[k], self.pi_dict[k, tags[k-1], tags[k]]))
+                print
+                # garbage collection
+                del tags
+                self.pi_dict.clear()
+                orig_sentence = list("*")
+                sentence = list("*")
+            l = test_file.readline()
+
+
 
 
 def usage():
@@ -312,12 +325,6 @@ if __name__ == "__main__":
     # #
 
 
-
-    sentence = ["the", "dog", "barks"]
-    counter.tag_dict["the"] = ["D", "N"]
-    counter.tag_dict["dog"] = ["D", "N"]
-    counter.tag_dict["barks"] = ["V"]
-
-    res = counter.viterbi(sys.argv[2])
+    res = counter.viterbi_file(sys.argv[2])
     print res
 
