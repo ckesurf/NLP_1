@@ -191,7 +191,7 @@ class Hmm(object):
 
 def replace_rare(name):
 
-    # create new file "ner_train_replaced.dat", copy filename contents to ntr file.
+    # create new file "ner_train.dat.replaced", copy filename contents to ntr file.
     try:
         filename = open(name,"r")
     except IOError:
@@ -213,7 +213,7 @@ def replace_rare(name):
     # now rewrite lines to new replacement file...
 
     filename = open(name, "r")
-    new_training = name + ".replaced"
+    new_training = name + ".replaced_rare"
     o = open(new_training,"a")
     l = filename.readline()
     while l:
@@ -222,33 +222,13 @@ def replace_rare(name):
             fields = line.split(" ")
             # ... and replace rare words with _RARE_
             if (word_count[fields[0]] < 5):
-                line = line.replace(fields[0], "_RARE_")
+                line = "_RARE_ " + fields[1]
+
         # Regardless, write line to new file
         o.write(line + '\n')
         l = filename.readline()
     filename.close()
     o.close()
-
-
-    # now replace all rare words
-    # new_training_tmp =  new_training + ".tmp"
-    #
-    # import os
-    # counter = 0
-    # for word in word_count:
-    #     if (word_count[word] < 5):
-    #         tmp = open(new_training_tmp,"a") #open for append
-    #         for l in open(new_training):
-    #             line = l.strip()
-    #             if line: # Nonempty line
-    #                 fields = line.split(" ")
-    #                 # word must match first term EXACTLY
-    #                 if (fields[0] == word):
-    #                     line = line.replace(word, "_RARE_")
-    #             tmp.write(line + '\n')
-    #         tmp.close()
-    #         os.remove(new_training)
-    #         os.rename(new_training_tmp, new_training)
 
 def usage():
     print """

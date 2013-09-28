@@ -195,50 +195,6 @@ class Hmm(object):
         return self.ngram_counts[2][(y1, y2, y3)]/self.ngram_counts[1][(y1, y2)]
 
 
-
-def replace_rare(name):
-
-    word_count = defaultdict(int)
-
-    # create new file "ner_train_replaced.dat", copy filename contents to ntr file.
-    filename = file(name, "r")
-    l = filename.readline()
-    while l:
-        line = l.strip()
-        if line: # Nonempty line
-            # Calculate frequency of word
-            fields = line.split(" ")
-            word_count[fields[0]] += 1
-
-        l = filename.readline()
-
-    # print out word counts
-    #print word_count
-
-    new_training = "ner_train_replaced.dat"
-    shutil.copyfile(name, new_training)
-
-
-    # now replace all rare words
-    new_training_tmp = "ner_train_replaced.dat.tmp"
-
-    import os
-
-    for word in word_count:
-        if (word_count[word] < 5):
-            tmp = open(new_training_tmp,"a") #open for append
-            for l in open(new_training):
-                line = l.strip()
-                if line: # Nonempty line
-                    fields = line.split(" ")
-                    # word must match first term EXACTLY
-                    if (fields[0] == word):
-                        line = line.replace(word, "_RARE_")
-                tmp.write(line + '\n')
-            tmp.close()
-            os.remove(new_training)
-            os.rename(new_training_tmp, new_training)
-
 def usage():
     print """
     python count_freqs.py [input_file] > [output_file]
@@ -247,9 +203,9 @@ def usage():
 
 if __name__ == "__main__":
 
-    # if len(sys.argv)!=2: # Expect exactly one argument: the training data file
-    #     usage()
-    #     sys.exit(2)
+    if len(sys.argv)!=2: # Expect exactly one argument: the training data file
+        usage()
+        sys.exit(2)
 
     try:
         input = file(sys.argv[1],"r")
@@ -260,22 +216,9 @@ if __name__ == "__main__":
     #
     #
     # Initialize a trigram counter
-    # counter = Hmm(3)
-    # # Collect counts
-    # counter.train(input)
-    # # Write the counts
-    # counter.write_counts(sys.stdout)
-
-    # Replace infrequent words (where Count(x) < 5) in input data file to _RARE_
-    # replace_rare(sys.argv[1])
-
-    # Print out entity tagger
     counter = Hmm(3)
-    # # Read counts, training the Hmm
-    counter.read_counts(input)
-    # # Now that we've trained our Hmm, try it out on development data
-    # dev_input = file(sys.argv[2], "r")
-    # counter.write_predictions(dev_input, sys.stdout)
+    # # Collect counts
+    counter.train(input)
+    # # Write the counts
+    counter.write_counts(sys.stdout)
 
-    # # testing trigram model
-    print counter.trigram_prob('O', 'O', 'I-LOC')
