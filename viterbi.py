@@ -1,7 +1,7 @@
 #! /usr/bin/python
 
-__author__="Daniel Bauer <bauer@cs.columbia.edu>"
-__date__ ="$Sep 12, 2011"
+__author__="Chris Erlendson <cke2106@columbia.edu>"
+__date__ ="$Sep 28, 2013"
 
 import sys
 from collections import defaultdict
@@ -9,8 +9,8 @@ import math
 import shutil
 
 """
-Count n-gram frequencies in a CoNLL NER data file and write counts to
-stdout. 
+       Read in a training input file, train Hmm, test on dev data, then print
+        word, tag, and log probabilities.
 """
 
 def simple_conll_corpus_iterator(corpus_file):
@@ -225,6 +225,7 @@ class Hmm(object):
             self.pi_dict[(index, u, v)] = max_prob
             return max_prob
 
+    # backpointers for the Viterbi algorithm, i.e. what tag matched this word in sentence best
     def bp(self, k, u, v, sentence):
         max_prob = prob = 0
         best_tag = ""
@@ -235,10 +236,10 @@ class Hmm(object):
                 best_tag = w
         return best_tag
 
+    # Implementation of Viterbi algorithm
     def viterbi(self, sentence):
         length = sentence.__len__() - 2     # -2 because we added two * strings
         # want k to go from 1 to n; range is exclusive, so following translates to [1, n]
-
         for k in range(1, length+1):
             for u in self.tag_dict[sentence[k-1]]:
                 for v in self.tag_dict[sentence[k]]:
@@ -265,6 +266,8 @@ class Hmm(object):
 
         return tags
 
+    # Reads in a file of sentences, prints out probability of each sentence according to Viterbi algorithm
+    # Note: Calls viterbi to do all the computation work.
     def viterbi_file(self, filename):
         orig_sentence = list("*")
         sentence = list("*")
@@ -300,8 +303,8 @@ class Hmm(object):
 
 def usage():
     print """
-    python count_freqs.py [input_file] > [output_file]
-        Read in a named entity tagged training input file, train Hmm, test on dev data, then print
+    python count_freqs.py [input_file] [dev_file] > [output_file]
+        Read in a training input file, train Hmm, test on dev data, then print
         word, tag, and log probabilities.
     """
 
@@ -322,9 +325,7 @@ if __name__ == "__main__":
     counter = Hmm(3)
     # Read counts, training the Hmm
     counter.read_counts(input)
-    # #
+    #
+    counter.viterbi_file(sys.argv[2])
 
-
-    res = counter.viterbi_file(sys.argv[2])
-    print res
 

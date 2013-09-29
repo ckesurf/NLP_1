@@ -1,7 +1,7 @@
 #! /usr/bin/python
 
-__author__="Chris Erlendson <cke2106@columbia.edu>"
-__date__ ="$Sep 28, 2013"
+__author__="Daniel Bauer <bauer@cs.columbia.edu>"
+__date__ ="$Sep 12, 2011"
 
 import sys
 from collections import defaultdict
@@ -9,8 +9,8 @@ import math
 import shutil
 
 """
-Read in a named entity tagged training input file, train Hmm, calculate probabilities of trigrams
-        in trigram_file
+Count n-gram frequencies in a CoNLL NER data file and write counts to
+stdout. 
 """
 
 def simple_conll_corpus_iterator(corpus_file):
@@ -87,6 +87,9 @@ class Hmm(object):
         self.ngram_counts = [defaultdict(int) for i in xrange(self.n)]
         self.all_states = set()
         self.tag_frequency = defaultdict(int)
+        self.tag_dict = defaultdict(list)
+        self.word_count = defaultdict(int)
+        self.pi_dict = dict([((0, '*', '*'), 1)])
 
     def train(self, corpus_file):
         """
@@ -151,13 +154,31 @@ class Hmm(object):
                 self.all_states.add(ne_tag)
                 self.tag_frequency[ne_tag] += self.emission_counts[(word, ne_tag)]
                 self.all_words.add(word)
+                self.tag_dict[word].append(ne_tag)
+                self.word_count[word] += 1
             elif parts[1].endswith("GRAM"):
                 n = int(parts[1].replace("-GRAM",""))
                 ngram = tuple(parts[2:])
                 self.ngram_counts[n-1][ngram] = count
 
+        self.tag_dict["*"] = "*"
+
     def emission_params(self, x, y):
-        return self.emission_counts[(x, y)]/float(self.tag_frequency[y])
+        # if x == "the" and y == "D":
+        #     return 0.8
+        # elif x == "dog" and y == "D":
+        #     return 0.2
+        # elif x == "the" and y == "N":
+        #     return 0.2
+        # elif x == "dog" and y == "N":
+        #     return 0.8
+        # elif x == "barks" and y == "V":
+        #     return 1
+
+        if x == "*" and y == "*":
+            return 1
+        else:
+            return self.emission_counts[(x, y)]/float(self.tag_frequency[y])
 
     def entity_tagger(self, x):
         # find the tag with highest emission_params score
@@ -169,40 +190,132 @@ class Hmm(object):
                 best_tag_prob = self.emission_params(x, tag)
         return best_tag
 
-
     def trigram_prob(self, y1, y2, y3):
+        # if y1 == "*" and y2 == "*" and y3 == "D":
+        #     return 1
+        # elif y1 == "*" and y2 == "D" and y3 == "N":
+        #     return 1
+        # elif y1 == "D" and y2 == "N" and y3 == "V":
+        #     return 1
+        # elif y1 == "N" and y2 == "V" and y3 == "STOP":
+        #     return 1
         count_y1_y2_y3 = self.ngram_counts[2][(y1, y2, y3)]
-        count_y1_y2 = self.ngram_counts[1][(y1, y2)]
-        return self.ngram_counts[2][(y1, y2, y3)]/self.ngram_counts[1][(y1, y2)]
+        count_y1_y2 = float(self.ngram_counts[1][(y1, y2)])
+        if count_y1_y2 == 0 or count_y1_y2_y3 == 0:
+            return 0
+        return count_y1_y2_y3/count_y1_y2
 
-    def write_tag_trigrams(self, trigram_file, output):
-        l = trigram_file.readline()
+    def pi(self, index, u, v, sentence):
+        if index == 0 and u == '*' and v == '*':
+            return 1
+        elif (index, u, v) in self.pi_dict:        # if we've already calculated this, return the corresponding prob
+            return self.pi_dict[(index, u, v)]
+        else:
+            max_prob = prob = 0
+            for t in self.tag_dict[sentence[index-2]]:
+                # if trigram_prob or emission params is 0, skip
+                tri = self.trigram_prob(t, u, v)
+                emission = self.emission_params(sentence[index], v)
+                if tri == 0 or emission == 0:       # We KNOW the resulting prob will always be nonzero
+                    continue
+                else:
+                    prob = self.pi(index-1, t, u, sentence)*tri*emission
+                    if prob > max_prob:
+                        max_prob = prob
+            self.pi_dict[(index, u, v)] = max_prob
+            return max_prob
+
+    def bp(self, k, u, v, sentence):
+        max_prob = prob = 0
+        best_tag = ""
+        for w in self.tag_dict[sentence[k-2]]:
+            prob = self.pi(k-1, w, u, sentence)*self.trigram_prob(w, u, v)*self.emission_params(sentence[k], v)
+            if prob > max_prob:
+                max_prob = prob
+                best_tag = w
+        return best_tag
+
+    def viterbi(self, sentence):
+        length = sentence.__len__() - 2     # -2 because we added two * strings
+        # want k to go from 1 to n; range is exclusive, so following translates to [1, n]
+
+        for k in range(1, length+1):
+            for u in self.tag_dict[sentence[k-1]]:
+                for v in self.tag_dict[sentence[k]]:
+                    self.pi(k, u, v, sentence)
+                    prob = self.pi_dict[(k, u, v)]
+
+        max_prob = prob = 0
+        best_u_tag = best_v_tag = ""
+        for u in self.tag_dict[sentence[k-1]]:
+            for v in self.tag_dict[sentence[k]]:
+                p = self.pi_dict[(length, u, v)]
+                t = self.trigram_prob(u, v, "STOP")
+                prob = self.pi_dict[(length, u, v)]*self.trigram_prob(u, v, "STOP")
+                if prob > max_prob:
+                    max_prob = prob
+                    best_u_tag = u
+                    best_v_tag = v
+
+        tags = {length-1: best_u_tag, length: best_v_tag, 0: "*"}
+        for k in range(length-2, 0, -1):
+            tags[k] = self.bp(k+2, tags[k+1], tags[k+2], sentence)
+
+
+
+        return tags
+
+    def viterbi_file(self, filename):
+        orig_sentence = list("*")
+        sentence = list("*")
+        test_file = file(filename, "r")
+        l = test_file.readline()
         while l:
-            line = l.strip()
-            if line: # Nonempty line
-                # Extract information from line.
-                # Each line has the format
-                # tag1 tag2 tag3
-                fields = line.split(" ")
-                log_prob = math.log(self.trigram_prob(fields[0], fields[1], fields[2]))
-                output.write("%s %f\n" %( line, log_prob ))
-            else:   # Blank line, just write it out.
-                output.write(line)
-            l = trigram_file.readline()
+            word = l.strip()
+            if word: # Nonempty line
+                orig_sentence.append(word)
+                # if rare, replace with _RARE_
+                if is_number(word):
+                    sentence.append("_NUMERAL_")
+                elif self.word_count[word] < 5:
+                    sentence.append("_RARE_")
+                else:
+                    sentence.append(word)
 
-            output.write("%s %f\n" %( line, log_prob ))
+            else: # Empty line
+                orig_sentence.append("*")
+                sentence.append("*")
+                # Viterbi time! Write probabilities and tags to stdout, then clear data
+                tags = self.viterbi(sentence)
+                for k in range(1, sentence.__len__()-1):
+                    print("%s %s %f" % (orig_sentence[k], tags[k], math.log(self.pi_dict[k, tags[k-1], tags[k]])))
+                print
+                # garbage collection
+                del tags
+                self.pi_dict.clear()
+                orig_sentence = list("*")
+                sentence = list("*")
+            l = test_file.readline()
+
+
+def is_number(s):
+    try:
+        float(s)
+        return True
+    except ValueError:
+        return False
 
 
 def usage():
     print """
-    python count_freqs.py [training_file] [trigram_file]
-        Read in a named entity tagged training input file, output calculate probabilities of trigrams
-        in trigram_file
+    python count_freqs.py [input_file] > [output_file]
+        Read in a named entity tagged training input file, train Hmm, test on dev data, then print
+        word, tag, and log probabilities.
     """
 
 if __name__ == "__main__":
 
-    if len(sys.argv)!=3: # Expect exactly two arguments: the training data file and development (test) file
+    if len(sys.argv)!=3: # Expect exactly two arguments: the training counts file and development (test) file
         usage()
         sys.exit(2)
 
@@ -212,15 +325,14 @@ if __name__ == "__main__":
         sys.stderr.write("ERROR: Cannot read inputfile %s.\n" % arg)
         sys.exit(1)
     #
-    try:
-        trigram_file = file(sys.argv[2],"r")
-    except IOError:
-        sys.stderr.write("ERROR: Cannot read trigram file %s.\n" % arg)
-        sys.exit(1)
     #
     #
     counter = Hmm(3)
     # Read counts, training the Hmm
     counter.read_counts(input)
-    # Now that we've trained our Hmm, write out trigrams with log probabilities
-    counter.write_tag_trigrams(trigram_file, sys.stdout)
+    # #
+
+
+    res = counter.viterbi_file(sys.argv[2])
+    print res
+

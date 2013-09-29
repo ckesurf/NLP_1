@@ -1,10 +1,12 @@
 #! /usr/bin/python
 
-__author__="Chris Erlendson <cke2106@columbia.edu>"
-__date__ ="$Sep 28, 2013"
+__author__="Daniel Bauer <bauer@cs.columbia.edu>"
+__date__ ="$Sep 12, 2011"
 
 import sys
 from collections import defaultdict
+import math
+import shutil
 
 """
 Count n-gram frequencies in a CoNLL NER data file and write counts to
@@ -131,16 +133,88 @@ class Hmm(object):
                 ngramstr = " ".join(ngram)
                 output.write("%i %i-GRAM %s\n" %(self.ngram_counts[n-1][ngram], n, ngramstr))
 
+    def read_counts(self, corpusfile):
+
+        self.n = 3
+        self.emission_counts = defaultdict(int)
+        self.ngram_counts = [defaultdict(int) for i in xrange(self.n)]
+        self.all_states = set()
+        self.all_words = set()
+        self.word_counts = defaultdict(int)
+
+        for line in corpusfile:
+            parts = line.strip().split(" ")
+            count = float(parts[0])
+            if parts[1] == "WORDTAG":
+                ne_tag = parts[2]
+                word = parts[3]
+                self.emission_counts[(word, ne_tag)] = count
+                self.all_states.add(ne_tag)
+                self.tag_frequency[ne_tag] += self.emission_counts[(word, ne_tag)]
+                self.all_words.add(word)
+                self.word_counts[word] += 1
+            elif parts[1].endswith("GRAM"):
+                n = int(parts[1].replace("-GRAM",""))
+                ngram = tuple(parts[2:])
+                self.ngram_counts[n-1][ngram] = count
+
+    def emission_params(self, x, y):
+        return self.emission_counts[(x, y)]/float(self.tag_frequency[y])
+
+    def entity_tagger(self, x):
+        # find the tag with highest emission_params score
+        best_tag = ""
+        best_tag_prob = 0
+        for tag in self.all_states:
+            if self.emission_params(x, tag) > best_tag_prob:
+                best_tag = tag
+                best_tag_prob = self.emission_params(x, tag)
+        return best_tag
+
+    def write_predictions(self, dev_input, output):
+        """
+        Writes log probability for each prediction in the following format:
+            word tag log_probability
+        """
+
+        for line in dev_input:
+            original_word = line.strip()
+            if original_word:
+                word = original_word
+                if is_number(word):
+                    word = "_NUMERAL_"
+                elif self.word_counts[word] < 5:
+                    word = "_RARE_"
+
+                best_tag = self.entity_tagger(word)
+                log_prob = math.log(self.emission_params(word, best_tag))
+                output.write("%s %s %f\n" % (original_word, best_tag, log_prob))
+            else:   # Blank line
+                output.write(line)
+
+    def trigram_prob(self, y1, y2, y3):
+        count_y1_y2_y3 = self.ngram_counts[2][(y1, y2, y3)]
+        count_y1_y2 = self.ngram_counts[1][(y1, y2)]
+        return self.ngram_counts[2][(y1, y2, y3)]/self.ngram_counts[1][(y1, y2)]
+
+
+def is_number(s):
+    try:
+        float(s)
+        return True
+    except ValueError:
+        return False
 
 def usage():
     print """
     python count_freqs.py [input_file] > [output_file]
-        Read in a named entity tagged training input file and produce counts.
+        Read in a named entity tagged training input file, train Hmm, test on dev data, then print
+        word, tag, and log probabilities.
     """
 
 if __name__ == "__main__":
 
-    if len(sys.argv)!=2: # Expect exactly one argument: the training data file
+    if len(sys.argv)!=3: # Expect exactly two arguments: the training data file and development (test) file
         usage()
         sys.exit(2)
 
@@ -152,10 +226,11 @@ if __name__ == "__main__":
     #
     #
     #
-    # Initialize a trigram counter
     counter = Hmm(3)
-    # Collect counts
-    counter.train(input)
-    # Write the counts
-    counter.write_counts(sys.stdout)
+    # Read counts, training the Hmm
+    counter.read_counts(input)
+    # Now that we've trained our Hmm, try it out on development data
+    dev_input = file(sys.argv[2], "r")
+    #
+    counter.write_predictions(dev_input, sys.stdout)
 

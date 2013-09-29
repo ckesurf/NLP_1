@@ -1,16 +1,15 @@
 #! /usr/bin/python
 
-__author__="Daniel Bauer <bauer@cs.columbia.edu>"
-__date__ ="$Sep 12, 2011"
+__author__="Chris Erlendson <cke2106@columbia.edu>"
+__date__ ="$Sep 28, 2013"
 
 import sys
 from collections import defaultdict
 import math
-import shutil
 
 """
-Count n-gram frequencies in a CoNLL NER data file and write counts to
-stdout. 
+Read in a named entity tagged training input file, train Hmm, test on dev data, then print
+        word, tag, and log probabilities.
 """
 
 def simple_conll_corpus_iterator(corpus_file):
@@ -190,18 +189,12 @@ class Hmm(object):
             else:   # Blank line
                 output.write(line)
 
-    def trigram_prob(self, y1, y2, y3):
-        count_y1_y2_y3 = self.ngram_counts[2][(y1, y2, y3)]
-        count_y1_y2 = self.ngram_counts[1][(y1, y2)]
-        return self.ngram_counts[2][(y1, y2, y3)]/self.ngram_counts[1][(y1, y2)]
-
-
 
 def usage():
     print """
-    python count_freqs.py [input_file] > [output_file]
-        Read in a named entity tagged training input file, train Hmm, test on dev data, then print
-        word, tag, and log probabilities.
+    python count_freqs.py [input_file] [dev_file] > [output_file]
+        Read in a training input_file, test on dev data, then print
+        word, tag, and log probabilities to output_file (ner.counts in our case).
     """
 
 if __name__ == "__main__":
